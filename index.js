@@ -1,51 +1,41 @@
-import { store } from 'quasar/wrappers'
-import { createStore } from 'vuex'
-// import * as Vue from 'vue'
-// import Vuex from 'vuex'
-import VuexPersistence from 'vuex-persist'
+import routes from './routes'
+import { route } from 'quasar/wrappers'
+import { createRouter, createMemoryHistory, createWebHistory, createWebHashHistory } from 'vue-router'
+import store from 'src/store'
 
-// Vue.use(Vuex)
 
-const vuexLocal = new VuexPersistence({
-  storage: window.sessionStorage
-})
-export default store(function (/* { ssrContext } */) {
-  const Store = createStore({
-    state:{         
-      username: "ftintern",
-      password: "shri",
-      loggedIn: false,
-    },
+/*
+ * If not building with SSR mode, you can
+ * directly export the Router instantiation;
+ *
+ * The function below can be async too; either use
+ * async/await or return a Promise which resolves
+ * with the Router instance.
+ */
 
-    modules: {
-      
-    },
 
-    actions:{
-      login ({commit}) {
-        commit('loginUser')
-      },
-      logout ({commit}) {
-        commit('logoutUser')
-      }
-    },
+export default route(function (/* { store, ssrContext } */) {
+  const createHistory = process.env.SERVER
+    ? createMemoryHistory
+    : (process.env.VUE_ROUTER_MODE === 'history' ? createWebHistory : createWebHashHistory)
 
-    mutations:{
-      loginUser (state) {
-        state.loggedIn = true
-      },
-      logoutUser (state) {
-        state.loggedIn = false
-      }
-    },
+  const Router = createRouter({
+    scrollBehavior: () => ({ left: 0, top: 0 }),
+    routes,
 
-    getters: {},
-    plugins: [vuexLocal.plugin]
-
-    // enable strict mode (adds overhead!)
-    // for dev mode and --debug builds only
-    // strict: process.env.DEBUGGING
+    // Leave this as is and make changes in quasar.conf.js instead!
+    // quasar.conf.js -> build -> vueRouterMode
+    // quasar.conf.js -> build -> publicPath
+    history: createHistory(process.env.MODE === 'ssr' ? void 0 : process.env.VUE_ROUTER_BASE)
   })
 
-  return Store
+  Router.beforeEach((to,from,next) => {
+    if (to.matched.some(record => record.meta.requireAuth) && !store.state.loggedIn){
+      next({ name: 'login', query: { next: to.fullPath } })
+    } else {
+      next()
+    }
+  })
+
+  return Router
 })
